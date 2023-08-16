@@ -418,6 +418,17 @@ WHERE year = '0'
 
 ALTER TABLE public.attacks ALTER COLUMN year TYPE NUMERIC USING(year::NUMERIC)
 
+---------------------------------------------------------------------------------
+/*let's clean the name column*/
+UPDATE public.attacks 
+SET name = 'Unregistered'
+WHERE 	
+	name like '%male%' 
+	OR name like '%female%'
+	OR name like '%boy%'
+	OR name like '%girl%' 
+
+
 --Here we have the cleaned data on which we will do analysis. 
 SELECT * FROM public.attacks
 
