@@ -174,15 +174,3 @@ ggplot(reporters, aes(investigator_or_source, active_investigators, fill = inves
         axis.text = element_text(face = 'bold.italic'),
         plot.title = element_text(face = 'bold', size = 16),
         legend.position = 'none')
-
-
-
-
-
-
-
-
-
-
-
-
