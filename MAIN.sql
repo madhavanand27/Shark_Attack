@@ -418,6 +418,8 @@ WHERE year = '0'
 
 ALTER TABLE public.attacks ALTER COLUMN year TYPE NUMERIC USING(year::NUMERIC)
 
+DELETE FROM public.attacks
+WHERE year IN (5,77,500)
 ---------------------------------------------------------------------------------
 /*let's clean the name column*/
 UPDATE public.attacks 
@@ -428,8 +430,177 @@ WHERE
 	OR name like '%boy%'
 	OR name like '%girl%' 
 
-
 --Here we have the cleaned data on which we will do analysis. 
 SELECT * FROM public.attacks
 
+---------------------------------------------------------------------------------
+/*Data analysis stage*/
 
+--Q1. Distribution of type by their count
+WITH per AS(SELECT 
+	type, 
+	COUNT(*) AS number_of_obsv
+FROM public.attacks
+GROUP BY type
+)
+SELECT 
+	type, 
+	number_of_obsv,
+	SUM(number_of_obsv) OVER() AS total,
+	ROUND(number_of_obsv / SUM(number_of_obsv) OVER() * 100, 2) AS percentage
+FROM per ;
+
+
+--Q2. TOP 10 countries where people had fatal injury
+SELECT 
+	country,
+	fatal_yn,
+	count(*) AS count
+FROM public.attacks
+WHERE fatal_yn = 'Y' 
+GROUP BY 	
+	country,
+	fatal_yn
+ORDER BY count DESC
+LIMIT 10 ;
+
+--Q3. Percentage of Cases by Gender
+WITH per AS(SELECT 
+	sex,
+	COUNT(*) AS number_of_observation
+FROM public.attacks
+GROUP BY sex)
+
+SELECT 
+	sex, 
+	number_of_observation, 
+	SUM(number_of_observation) OVER () AS total,
+	ROUND(number_of_observation / SUM(number_of_observation) OVER () * 100, 2) AS percentage
+FROM per GROUP BY sex, number_of_observation ;
+
+--Q4. What is the age of people with Fatal Vs Non-Fatal 
+--part (a)
+SELECT 
+	age, 
+	fatal_yn, 
+	COUNT(*) AS number_of_observation,
+	CASE
+		WHEN age >= 1 AND age <= 12 THEN 'Children'
+		WHEN age >= 13 AND age <=17 THEN 'Adolescents'
+		WHEN age >= 18 AND age <= 29 THEN 'In twenties'
+		WHEN age >= 30 AND age <= 39 THEN 'In thirties'
+		WHEN age >= 40 AND age <= 49 THEN 'In fourties'
+		WHEN age >= 50 AND age <= 59 THEN 'In fifties'		
+		WHEN age >= 60 AND age <= 69 THEN 'In sixties'
+		WHEN age >= 70 AND age <= 79 THEN 'In seventies'
+		WHEN age >= 80 AND age <= 89 THEN 'In eighties'
+		ELSE CAST(age AS VARCHAR)
+		END AS age_category --Converting age to string.
+FROM public.attacks
+WHERE 
+	fatal_yn  = 'Y' 
+	AND age IS NOT NULL
+GROUP BY 
+	age, 
+	fatal_yn
+ORDER BY number_of_observation DESC ;
+--part (b)
+SELECT 
+	age, 
+	fatal_yn, 
+	COUNT(*) AS number_of_observation,
+	CASE
+		WHEN age >= 1 AND age <= 12 THEN 'Children'
+		WHEN age >= 13 AND age <=17 THEN 'Adolescents'
+		WHEN age >= 18 AND age <= 29 THEN 'In twenties'
+		WHEN age >= 30 AND age <= 39 THEN 'In thirties'
+		WHEN age >= 40 AND age <= 49 THEN 'In fourties'
+		WHEN age >= 50 AND age <= 59 THEN 'In fifties'
+		WHEN age >= 60 AND age <= 69 THEN 'In sixties'
+		WHEN age >= 70 AND age <= 79 THEN 'In seventies'
+		WHEN age >= 80 AND age <= 89 THEN 'In eighties'
+		ELSE CAST(age AS VARCHAR)
+		END AS age_category --Converting age to string.
+FROM public.attacks
+WHERE 
+	fatal_yn  = 'N'
+	AND age IS NOT NULL
+GROUP BY 
+	age, 
+	fatal_yn
+ORDER BY number_of_observation DESC ;
+
+--Q5. Number of deaths by gender in each country.
+SELECT 
+	country,
+	sex,
+	COUNT(*) AS number_of_deaths
+FROM public.attacks
+WHERE fatal_yn = 'Y'
+GROUP BY 
+	country,
+	sex
+ORDER BY number_of_deaths DESC	;
+
+--Q6. TOP 20 years with the most reported cases and rank them based on the count. 
+WITH cases_by_year AS(SELECT
+	year,
+	COUNT(*) AS reported_cases
+FROM public.attacks
+GROUP BY year
+					 	)
+SELECT 
+	year,
+	reported_cases,
+	ROW_NUMBER() OVER(
+		ORDER BY reported_cases DESC) AS rank
+FROM cases_by_year
+LIMIT 20 ; 
+
+--Q7. Distribution of Data by Attack Time Devided by Gender. Also show their %tage partioned by grouped_time. 
+WITH percentage AS(SELECT 
+	grouped_time, 
+	sex, 
+	COUNT(*) AS number_of_attacks
+FROM public.attacks
+WHERE 
+	fatal_yn = 'Y' 
+	AND grouped_time != 'Not Recorded'
+	AND sex != 'not defined'
+GROUP BY grouped_time, sex
+ORDER BY 2 DESC )
+SELECT
+	ROW_NUMBER() OVER(
+			ORDER BY number_of_attacks DESC) AS index,
+	grouped_time,
+	sex,
+	number_of_attacks,
+	CONCAT(
+		ROUND(number_of_attacks / 
+			  SUM(number_of_attacks) OVER(
+				  	PARTITION BY grouped_time) * 100, 2), '%') AS percentage_distribution
+FROM percentage 
+
+--Q8. Which Species are more aggressive, with the highest fatal rate?
+SELECT 
+	species,
+	COUNT(*) AS number_of_attempts
+FROM public.attacks
+WHERE 
+	fatal_yn = 'Y' 
+	AND species != 'Unknown'
+GROUP BY species
+ORDER BY number_of_attempts DESC --there are 732 species which are unknown. We will filter it out for visualization. 
+LIMIT 4
+
+--Q9. Find the active investigators. Active investigators are people, or organizations that have reported at least 50 cases. 
+SELECT * FROM 
+(
+	SELECT 
+		DISTINCT investigator_or_source,
+		COUNT(*) AS active_investigators
+	FROM public.attacks
+	GROUP BY investigator_or_source
+	ORDER BY active_investigators DESC
+)reporters 
+	WHERE reporters.active_investigators >= 50 -- So there are 5 top reporters in our data. 
