@@ -581,7 +581,7 @@ SELECT
 				  	PARTITION BY grouped_time) * 100, 2), '%') AS percentage_distribution
 FROM percentage 
 
---Q8. Which Species are more aggressive, with the highest fatal rate?
+--Q8. Which Species are more aggressive, with the highest fatal rate.
 SELECT 
 	species,
 	COUNT(*) AS number_of_attempts
@@ -593,7 +593,7 @@ GROUP BY species
 ORDER BY number_of_attempts DESC --there are 732 species which are unknown. We will filter it out for visualization. 
 LIMIT 4
 
---Q9. Find the active investigators. Active investigators are people, or organizations that have reported at least 50 cases. 
+--Q9. Find the active investigators. Active investigator are people, or organizations that have reported at least 50 cases. 
 SELECT * FROM 
 (
 	SELECT 
